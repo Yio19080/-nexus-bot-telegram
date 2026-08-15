@@ -1,2 +1,5 @@
-    pyTelegramBotAPI
-    google-generativeai
+pyTelegramBotAPI
+flask
+requests
+google-generativeai
+reportlab
