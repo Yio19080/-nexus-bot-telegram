@@ -8,34 +8,10 @@ import google.generativeai as genai
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-# 🟢 إضافات السيرفر خفيف الوزن (Flask) للتنشيط
-from flask import Flask
-from threading import Thread
-
 # ==========================================
-# 🌐 إنشاء سيرفر التنشيط (Web Health Server)
+# 🔑 الإعدادات والمفاتيح (تم تحديث التوكن)
 # ==========================================
-app = Flask(__name__)
-
-@app.route('/')
-@app.route('/health')
-def health_check():
-    return "bot is alive", 200
-
-def run_web_server():
-    # يتم قراءة البورت الافتراضي للمستضيف أو استخدام 8080 تلقائياً
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
-
-def keep_alive():
-    t = Thread(target=run_web_server)
-    t.daemon = True
-    t.start()
-
-# ==========================================
-# 🔑 الإعدادات والمفاتيح
-# ==========================================
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
+TELEGRAM_TOKEN = "8617844634:AAGfD4f-dpgmpPn2Zo0ZPdaGq09Vvm7cL18"
 GEMINI_KEY = os.getenv("GEMINI_KEY", "YOUR_GEMINI_API_KEY")
 YOUR_USERNAME = os.getenv("YOUR_USERNAME", "@YOUR_USERNAME")
 CHANNEL_ID = os.getenv("CHANNEL_ID", "@YOUR_CHANNEL_USERNAME")
@@ -150,7 +126,7 @@ CATALOG = {
         "title": "📚 الدروس والمحاضرات التعليمية",
         "items": {
             "c1": {"name": "🎓 كورس البرمجة بلغة Python من الصفر", "price_usd": 20.0, "price_sdg": 50000, "desc": "محاضرات مسجلة مع تطبيقات عملية وبناء مشاريع حقيقية.", "deliver": f"🎓 <b>رابط كورس البايثون:</b> {PYTHON_COURSE_URL}"},
-            "c2": {"name": "📊 ملخصات ومذكرات جامعية شاملة", "price_usd": 5.0, "price_sdg": 12500, "desc": "حقيبة تعليمية متكاملة تشمل أهم المذكرات والملخصات.", "deliver": f"📂 <b>رابط الحقيبة التعليمية:</b> {UNIVERSITY_NOTES_URL}"}
+            "c2": {"name": "📊 ملخصات ومذكرة جامعية شاملة", "price_usd": 5.0, "price_sdg": 12500, "desc": "حقيبة تعليمية متكاملة تشمل أهم المذكرات والملخصات.", "deliver": f"📂 <b>رابط الحقيبة التعليمية:</b> {UNIVERSITY_NOTES_URL}"}
         }
     },
     "ads": {
@@ -179,7 +155,7 @@ def generate_persuasive_pitch(service_type, user_text, user_language_code="ar"):
     1. اكتشف لغة العميل وأجبه بالنفس اللغـة فوراً (سواء كانت عربية، إنجليزية، فرنسية، إلخ).
     2. تحدث بأسلوب راقي، جذاب، مفعم بالحماس، ويظهر الفائدة القوية والتأثير الإيجابي الذي سيحصل عليه العميل عند شراء هذه الخدمة المصممة له بالذكاء الاصطناعي.
     3. وضح له كيف أن الاستثمار في هذه الخدمة بسعر بسيط جداً سيوفر عليه وقتاً وجهداً ويعطيه نتائج سينمائية/احترافية فائقة الجودة.
-    4. اختم حديثك بدعوته بلباقة للشراء وااختيار الخدمة من القائمة.
+    4. اختم حديثك بدعوته بلباقة للشراء واختيار الخدمة من القائمة.
     5. حافظ على إيجاز الرسالة وجمال تنسيقها (استخدم إيموجي مناسبة وبدون تكلف).
     """
     try:
@@ -261,7 +237,6 @@ def handle_design_sales_pitch(message):
     service_type = "تصميم صورة احترافية" if "صورة" in message.text else "تصميم فيديو تسويقي"
     
     bot.send_chat_action(user_id, 'typing')
-    
     pitch = generate_persuasive_pitch(service_type, user_text, lang_code)
 
     markup = types.InlineKeyboardMarkup(row_width=1)
@@ -582,11 +557,10 @@ def handle_payment_proof(message):
         bot.send_message(user_id, "💡 <b>طلب جديد؟ تفضل باستعراض الخدمات المتاحة عبر /start</b>")
 
 # ==========================================
-# ⚡ تشغيل البوت مع سيرفر التنشيط
+# ⚡ تشغيل البوت
 # ==========================================
 if __name__ == "__main__":
-    print("🌐 جاري تشغيل سيرفر التنشيط (Web Server)...")
-    keep_alive()  # تشغيل سيرفر الفلاسك في الخلفية
-    
     print("🚀 Nexus Store AI Bot - يعمل بنجاح...")
     bot.infinity_polling()
+
+
