@@ -1,5 +1,8 @@
 pyTelegramBotAPI
-flask
-requests
 google-generativeai
+requests
+flask
 reportlab
+pypdf
+gTTS
+duckduckgo_search
