@@ -27,11 +27,8 @@ def keep_alive():
 TELEGRAM_TOKEN = os.getenv("BOT_TOKEN", "8617844634:AAGfD4f-dpgmpPn2Zo0ZPdaGq09Vvm7cL18")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "ضع_مفتاح_GEMINI_هنا")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7899998427"))
-CHANNEL_ID = os.getenv("CHANNEL_ID", "@NexusStoreAr")
 CHANNEL_LINK = "https://t.me/NexusStoreAr"
-YOUR_USERNAME = os.getenv("YOUR_USERNAME", "@Nexus_Support_v1_Bot")
 
-# 💳 بيانات الدفع الحقيقية المحدثة
 BANKAK_ACCOUNT = "9412190"
 BANKAK_NAME = "يوسف إبراهيم الطيب عبد القادر"
 BINANCE_PAY_ID = "943209825"
@@ -42,12 +39,11 @@ ai_model = genai.GenerativeModel('gemini-1.5-flash')
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN, parse_mode="HTML")
 
-pending_orders = {}
 admin_states = {}
 user_states = {}
 
 # ==========================================
-# 🗄️ قاعدة البيانات المتقدمة والمحدثة
+# 🗄️ قاعدة البيانات المحدثة (مع روابط الفيديو)
 # ==========================================
 def init_db():
     conn = sqlite3.connect('nexus_store.db')
@@ -66,39 +62,32 @@ def init_db():
             name TEXT UNIQUE,
             price_usd REAL,
             price_sdg REAL,
-            link TEXT DEFAULT 'https://t.me/NexusStoreAr'
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS tickets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            message TEXT,
-            status TEXT DEFAULT 'OPEN'
+            link TEXT DEFAULT 'https://t.me/NexusStoreAr',
+            video_url TEXT DEFAULT 'https://youtube.com'
         )
     ''')
     
-    # المنتجات الثابتة المحدثة بأسعارها
+    # المنتجات الافتراضية مع روابط فيديوهات توضيحية من يوتيوب
     default_products = [
-        ("حزمة المونتاج الشاملة 🎬", 8.0, 15000.0),
-        ("منشئ الـ CV الذكي 📝", 5.0, 10000.0),
-        ("كتاب أساسيات لغة بايثون بالعربي 🐍", 5.0, 10000.0),
-        ("حزمة أيقونات وأزرار للمطورين والمصممين 🎨", 4.0, 8000.0),
-        ("قالب موقع متجر إلكتروني احترافي 🌐", 15.0, 30000.0),
-        ("دليل أوامر الذكاء الاصطناعي للمطورين 🤖", 6.0, 12000.0),
-        ("كتاب التفكير الكمبيوتري والبرمجة بالعربي 📘", 5.0, 10000.0),
-        ("حزمة كود الخوارزميات وهياكل البيانات 💻", 8.0, 15000.0),
-        ("كود مصدري لمتجر إلكتروني متكامل جاهز للتعديل 🛒", 20.0, 45000.0),
-        ("دليل أدوات الحماية واختبار الاختراق للمطورين 🛡️", 6.0, 12000.0),
-        ("قالب Admin Dashboard جاهز للمطورين 📊", 10.0, 20000.0),
-        ("دليل أوامر ChatGPT المتقدمة للمطورين 💡", 5.0, 10000.0)
+        ("حزمة المونتاج الشاملة 🎬", 8.0, 15000.0, "https://www.youtube.com/results?search_query=video+editing+pack"),
+        ("منشئ الـ CV الذكي 📝", 5.0, 10000.0, "https://www.youtube.com/results?search_query=smart+cv+builder"),
+        ("كتاب أساسيات لغة بايثون بالعربي 🐍", 5.0, 10000.0, "https://www.youtube.com/results?search_query=python+for+beginners+arabic"),
+        ("حزمة أيقونات وأزرار للمطورين والمصممين 🎨", 4.0, 8000.0, "https://www.youtube.com/results?search_query=ui+ux+icons+pack"),
+        ("قالب موقع متجر إلكتروني احترافي 🌐", 15.0, 30000.0, "https://www.youtube.com/results?search_query=e+commerce+website+template"),
+        ("دليل أوامر الذكاء الاصطناعي للمطورين 🤖", 6.0, 12000.0, "https://www.youtube.com/results?search_query=ai+prompts+for+developers"),
+        ("كتاب التفكير الكمبيوتري والبرمجة بالعربي 📘", 5.0, 10000.0, "https://www.youtube.com/results?search_query=computational+thinking+arabic"),
+        ("حزمة كود الخوارزميات وهياكل البيانات 💻", 8.0, 15000.0, "https://www.youtube.com/results?search_query=data+structures+algorithms"),
+        ("كود مصدري لمتجر إلكتروني متكامل جاهز للتعديل 🛒", 20.0, 45000.0, "https://www.youtube.com/results?search_query=telegram+bot+store+source+code"),
+        ("دليل أدوات الحماية واختبار الاختراق للمطورين 🛡️", 6.0, 12000.0, "https://www.youtube.com/results?search_query=penetration+testing+tools"),
+        ("قالب Admin Dashboard جاهز للمطورين 📊", 10.0, 20000.0, "https://www.youtube.com/results?search_query=admin+dashboard+template"),
+        ("دليل أوامر ChatGPT المتقدمة للمطورين 💡", 5.0, 10000.0, "https://www.youtube.com/results?search_query=chatgpt+advanced+prompts")
     ]
     
-    for name, p_usd, p_sdg in default_products:
+    for name, p_usd, p_sdg, v_url in default_products:
         cursor.execute('''
-            INSERT OR IGNORE INTO products (name, price_usd, price_sdg)
-            VALUES (?, ?, ?)
-        ''', (name, p_usd, p_sdg))
+            INSERT OR IGNORE INTO products (name, price_usd, price_sdg, video_url)
+            VALUES (?, ?, ?, ?)
+        ''', (name, p_usd, p_sdg, v_url))
 
     conn.commit()
     conn.close()
@@ -107,25 +96,24 @@ def add_user(user_id, ref_id=0):
     conn = sqlite3.connect('nexus_store.db')
     cursor = conn.cursor()
     cursor.execute("INSERT OR IGNORE INTO users (user_id, referred_by) VALUES (?, ?)", (user_id, ref_id))
-    if ref_id and ref_id != user_id:
-        cursor.execute("UPDATE users SET discount_points = discount_points + 10 WHERE user_id = ?", (ref_id,))
     conn.commit()
     conn.close()
 
 def get_products():
     conn = sqlite3.connect('nexus_store.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, price_usd, price_sdg, link FROM products")
+    cursor.execute("SELECT id, name, price_usd, price_sdg, link, video_url FROM products")
     items = cursor.fetchall()
     conn.close()
     return items
 
-def add_product(name, price_usd, price_sdg, link="https://t.me/NexusStoreAr"):
+def get_product_by_id(p_id):
     conn = sqlite3.connect('nexus_store.db')
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO products (name, price_usd, price_sdg, link) VALUES (?, ?, ?, ?)", (name, price_usd, price_sdg, link))
-    conn.commit()
+    cursor.execute("SELECT id, name, price_usd, price_sdg, video_url FROM products WHERE id = ?", (p_id,))
+    item = cursor.fetchone()
     conn.close()
+    return item
 
 def get_all_users():
     conn = sqlite3.connect('nexus_store.db')
@@ -138,264 +126,179 @@ def get_all_users():
 init_db()
 
 # ==========================================
-# 🤖 فحص الإشعار بالـ AI بعد 3 دقائق
+# 👁️ دالة المراقبة الشفافة (إرسال نسخة للمالك)
 # ==========================================
-def verify_receipt_with_ai(image_path):
+def forward_to_admin(user_message, bot_response=None):
     try:
-        sample_file = genai.upload_file(path=image_path)
-        prompt = (
-            "Examine this transfer receipt strictly. "
-            "Verify amount, currency (SDG or USD), date, and authenticity. "
-            "Respond ONLY with 'APPROVED' if genuine or 'REJECTED' if fake."
-        )
-        response = ai_model.generate_content([sample_file, prompt])
-        return "APPROVED" if "APPROVED" in response.text.strip().upper() else "REJECTED"
-    except Exception:
-        return "REJECTED"
-
-def auto_process_receipt(order_id, user_id, photo_path, admin_msg_id, item_name, deliver_link):
-    time.sleep(180)
-    if order_id in pending_orders and pending_orders[order_id]['status'] == 'WAITING':
-        pending_orders[order_id]['status'] = 'PROCESSING'
-        verdict = verify_receipt_with_ai(photo_path)
+        user_info = f"👤 <b>الزبون:</b> {user_message.from_user.first_name} (<code>{user_message.chat.id}</code>)"
+        msg_text = f"👁️ <b>مراقبة محادثة زبون:</b>\n{user_info}\n\n💬 <b>رسالة الزبون:</b>\n<i>{user_message.text}</i>"
         
-        if verdict == "APPROVED":
-            bot.send_message(user_id, f"🎉 <b>تم الفحص والتحقق آلياً!</b>\n\n📦 <b>رابط استلام ({item_name}):</b>\n{deliver_link}")
-            bot.edit_message_caption(f"🤖 <b>تم القبول والتسليم أوتوماتيكياً عبر الذكاء الاصطناعي</b>\n🆔 العميل: <code>{user_id}</code>", ADMIN_ID, admin_msg_id)
-        else:
-            bot.send_message(user_id, f"❌ <b>تعذر التأكد من صحة الإشعار آلياً.</b>\nتواصل مع الدعم: {YOUR_USERNAME}")
-            bot.edit_message_caption(f"🔴 <b>تم الرفض أوتوماتيكياً بواسطة الذكاء الاصطناعي (مستند غير واضح)</b>\n🆔 العميل: <code>{user_id}</code>", ADMIN_ID, admin_msg_id)
-
-        if os.path.exists(photo_path):
-            os.remove(photo_path)
-        del pending_orders[order_id]
+        if bot_response:
+            msg_text += f"\n\n🤖 <b>رد البوت عليه:</b>\n{bot_response}"
+            
+        bot.send_message(ADMIN_ID, msg_text)
+    except Exception:
+        pass
 
 # ==========================================
-# 🚀 التفاعل القوائم الرئيسية
+# 🚀 القائمة الرئيسية
 # ==========================================
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     user_id = message.chat.id
-    args = message.text.split()
-    ref_id = int(args[1]) if len(args) > 1 and args[1].isdigit() else 0
-    
-    add_user(user_id, ref_id)
+    add_user(user_id)
     
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("📦 المنتجات والخدمات", callback_data="show_catalog"),
-        types.InlineKeyboardButton("💳 طرق الدفع (بنكك/دولار)", callback_data="show_payment")
+        types.InlineKeyboardButton("📦 تصفح المتجر والمنتجات", callback_data="show_catalog"),
+        types.InlineKeyboardButton("💡 مولد أفكار المشاريع (مجاناً)", callback_data="gen_project_idea")
     )
     markup.add(
-        types.InlineKeyboardButton("📢 قناة المتجر الرسمية", url=CHANNEL_LINK),
-        types.InlineKeyboardButton("📩 تقديم شكوى / استفسار", callback_data="open_ticket")
+        types.InlineKeyboardButton("🎁 جرعة الرفاهية والمعرفة اليومية", callback_data="daily_free_feature"),
+        types.InlineKeyboardButton("🤖 المساعد الذكي لاقتراح المنتجات", callback_data="ask_ai_assistant")
+    )
+    markup.add(
+        types.InlineKeyboardButton("💳 طرق الدفع", callback_data="show_payment"),
+        types.InlineKeyboardButton("📩 الشكاوى والدعم", callback_data="open_ticket")
     )
     
     if user_id == ADMIN_ID:
         markup.add(types.InlineKeyboardButton("👑 لوحة التحكم الإدارية", callback_data="admin_panel"))
         
     welcome_text = (
-        f"أهلاً بك يا <b>{message.from_user.first_name}</b> في متجر Nexus Store المتكامل! 🌟\n\n"
-        f"📢 <b>تابع قناتنا الرسمية للتحديثات:</b>\n{CHANNEL_LINK}"
+        f"أهلاً بك يا <b>{message.from_user.first_name}</b> في متجر Nexus المتطور! 🌟\n\n"
+        "استمتع بالخدمات اليومية المجانية بالذكاء الاصطناعي واستكشف أحدث الرقميات لدينا مع الشروحات والفيديوهات التوضيحية."
     )
     bot.send_message(user_id, welcome_text, reply_markup=markup)
 
 # ==========================================
-# 💬 مساحة المحادثة والردود (بين المالك والبوت)
-# ==========================================
-@bot.message_handler(func=lambda msg: msg.chat.id == ADMIN_ID and admin_states.get(ADMIN_ID) is None and not msg.text.startswith('/'))
-def admin_ai_chat(message):
-    try:
-        response = ai_model.generate_content(message.text)
-        bot.send_message(ADMIN_ID, f"🤖 <b>الرد الذكي:</b>\n\n{response.text}")
-    except Exception as e:
-        bot.send_message(ADMIN_ID, f"⚠️ يحدث خطأ أثناء معالجة الرد: {e}")
-
-# ==========================================
-# 📥 التعامل مع الشكاوى وإعدادات المالك
-# ==========================================
-@bot.message_handler(func=lambda msg: user_states.get(msg.chat.id) == "WAITING_TICKET")
-def handle_user_ticket(message):
-    user_id = message.chat.id
-    user_states[user_id] = None
-    
-    bot.send_message(user_id, "✅ <b>تم إرسال شكواك/استفسارك للمالك بنجاح!</b> سيتم الرد عليك فوراً عبر البوت.")
-    
-    admin_markup = types.InlineKeyboardMarkup()
-    admin_markup.add(types.InlineKeyboardButton("💬 الرد على الشكوى", callback_data=f"reply_ticket_{user_id}"))
-    
-    msg_to_admin = f"⚠️ <b>شكوى / استفسار جديد من زبون:</b>\n🆔 ID: <code>{user_id}</code>\n👤 الاسم: {message.from_user.first_name}\n\n💬 الرسالة:\n<i>{message.text}</i>"
-    bot.send_message(ADMIN_ID, msg_to_admin, reply_markup=admin_markup)
-
-@bot.message_handler(func=lambda msg: msg.chat.id == ADMIN_ID and admin_states.get(ADMIN_ID) is not None)
-def handle_admin_inputs(message):
-    state = admin_states.get(ADMIN_ID)
-    
-    if state == "WAITING_BROADCAST":
-        admin_states[ADMIN_ID] = None
-        users = get_all_users()
-        sent = 0
-        for u_id in users:
-            try:
-                bot.copy_message(u_id, ADMIN_ID, message.message_id)
-                sent += 1
-                time.sleep(0.04)
-            except Exception:
-                pass
-        bot.send_message(ADMIN_ID, f"✅ تم إرسال الإذاعة بنجاح إلى <code>{sent}</code> مستخدم.")
-
-    elif state == "WAITING_ADD_PRODUCT":
-        admin_states[ADMIN_ID] = None
-        try:
-            parts = message.text.split('|')
-            p_name = parts[0].strip()
-            p_usd = float(parts[1].strip())
-            p_sdg = float(parts[2].strip())
-            p_link = parts[3].strip() if len(parts) > 3 else "https://t.me/NexusStoreAr"
-            
-            add_product(p_name, p_usd, p_sdg, p_link)
-            bot.send_message(ADMIN_ID, f"✅ تم إضافة المنتج <b>{p_name}</b> بنجاح!")
-        except Exception:
-            bot.send_message(ADMIN_ID, "❌ صيغة خاطئة. أرسل البيانات هكذا:\n<code>اسم المنتج | السعر بالدولار | السعر بالجنيه | رابط التسليم</code>")
-
-    elif state.startswith("REPLYING_TO_"):
-        target_user_id = int(state.replace("REPLYING_TO_", ""))
-        admin_states[ADMIN_ID] = None
-        bot.send_message(target_user_id, f"📩 <b>رد من إدارة المتجر:</b>\n\n{message.text}")
-        bot.send_message(ADMIN_ID, f"✅ تم إرسال الرد إلى الزبون <code>{target_user_id}</code> بنجاح.")
-
-# ==========================================
-# 📥 استقبال صور الإشعارات
-# ==========================================
-@bot.message_handler(content_types=['photo'])
-def handle_payment_proof(message):
-    user_id = message.chat.id
-    photo_id = message.photo[-1].file_id
-    order_id = f"{user_id}_{message.message_id}"
-
-    file_info = bot.get_file(photo_id)
-    downloaded_file = bot.download_file(file_info.file_path)
-    photo_path = f"receipt_{order_id}.jpg"
-    
-    with open(photo_path, 'wb') as new_file:
-        new_file.write(downloaded_file)
-
-    item_name = "الخدمة الرقمية"
-    deliver_link = CHANNEL_LINK
-
-    bot.send_message(user_id, "✅ <b>تم استلام الإشعار بنجاح!</b>\nسيتم التحقق آلياً وتسليم طلبك خلال 3 دقائق.")
-
-    admin_markup = types.InlineKeyboardMarkup(row_width=1)
-    admin_markup.add(
-        types.InlineKeyboardButton("🟢 تأكيد الدفع فوراً", callback_data=f"approve_{order_id}"),
-        types.InlineKeyboardButton("🔴 رفض الطلب فوراً", callback_data=f"reject_{order_id}")
-    )
-    admin_msg = f"📥 <b>إشعار دفع جديد!</b>\n🆔 <b>ID:</b> <code>{user_id}</code>\n⏳ <i>ينتظر الفحص اليدوي أو الآلي بالـ AI بعد 3 دقائق...</i>"
-    sent_msg = bot.send_photo(ADMIN_ID, photo_id, caption=admin_msg, reply_markup=admin_markup)
-
-    pending_orders[order_id] = {
-        "status": "WAITING",
-        "user_id": user_id,
-        "item_name": item_name,
-        "deliver": deliver_link,
-        "photo_path": photo_path
-    }
-
-    t = threading.Thread(target=auto_process_receipt, args=(order_id, user_id, photo_path, sent_msg.message_id, item_name, deliver_link))
-    t.daemon = True
-    t.start()
-
-# ==========================================
-# 🔘 معالجة الضغط على الأزرار
+# 🔘 معالجة الأزرار والخدمات
 # ==========================================
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
     data = call.data
     user_id = call.message.chat.id
 
+    # --- لوحة المالك والدردشة مع البوت ---
     if data == "admin_panel" and user_id == ADMIN_ID:
         users_count = len(get_all_users())
         markup = types.InlineKeyboardMarkup(row_width=1)
         markup.add(
+            types.InlineKeyboardButton("💬 بدء محادثة ودردشة مع البوت (Gemini)", callback_data="start_admin_chat"),
             types.InlineKeyboardButton("📢 إرسال إذاعة جماعية (Broadcast)", callback_data="start_broadcast"),
             types.InlineKeyboardButton("➕ إضافة منتج جديد للمتجر", callback_data="trigger_add_product")
         )
         msg = f"👑 <b>لوحة تحكم المالك:</b>\n\n👥 <b>عدد العملاء:</b> <code>{users_count}</code>\n⚡ اختر الإجراء المطلوب:"
         bot.send_message(user_id, msg, reply_markup=markup)
 
-    elif data == "start_broadcast" and user_id == ADMIN_ID:
-        admin_states[ADMIN_ID] = "WAITING_BROADCAST"
-        bot.send_message(user_id, "📢 أرسل الرسالة الآن لنشرها لكافة المستخدمين:")
+    elif data == "start_admin_chat" and user_id == ADMIN_ID:
+        admin_states[ADMIN_ID] = "WAITING_ADMIN_AI"
+        bot.send_message(user_id, "🤖 <b>وضع الدردشة الذكية مفعل!</b>\nأرسل أي سؤال أو استفسار وسأجيبك فوراً:")
 
-    elif data == "trigger_add_product" and user_id == ADMIN_ID:
-        admin_states[ADMIN_ID] = "WAITING_ADD_PRODUCT"
-        bot.send_message(user_id, "📝 أرسل بيانات المنتج بالصيغة الآتية:\n<code>اسم المنتج | السعر بالدولار | السعر بالجنيه | رابط التسليم</code>")
-
-    elif data.startswith("reply_ticket_") and user_id == ADMIN_ID:
-        target_id = data.replace("reply_ticket_", "")
-        admin_states[ADMIN_ID] = f"REPLYING_TO_{target_id}"
-        bot.send_message(user_id, f"💬 أرسل الرد المباشر الذي تريد توجيهه للزبون <code>{target_id}</code>:")
-
-    elif data == "open_ticket":
-        user_states[user_id] = "WAITING_TICKET"
-        bot.send_message(user_id, "📩 <b>يرجى كتابة تفاصيل الشكوى أو الاستفسار في رسالة واحدة الآن:</b>")
-
+    # --- عرض المنتجات والشرح والفيديو ---
     elif data == "show_catalog":
         products = get_products()
-        msg = f"📦 <b>قائمة المنتجات المتاحة:</b>\n📢 تابع القناة: {CHANNEL_LINK}\n\n"
         markup = types.InlineKeyboardMarkup(row_width=1)
         for p in products:
-            msg += f"• <b>{p[1]}</b> - السعر: <code>{p[3]:,.0f} SDG / ${p[2]:.0f}</code>\n"
-            markup.add(types.InlineKeyboardButton(f"🛒 شراء {p[1]}", callback_data=f"buy_info_{p[0]}"))
+            markup.add(types.InlineKeyboardButton(f"{p[1]} - {p[3]:,.0f} SDG / ${p[2]:.0f}", callback_data=f"product_detail_{p[0]}"))
+        bot.send_message(user_id, "📦 <b>اضغط على أي منتج لعرض الشرح الذكي والفيديو التوضيحي:</b>", reply_markup=markup)
+
+    elif data.startswith("product_detail_"):
+        p_id = int(data.replace("product_detail_", ""))
+        product = get_product_by_id(p_id)
+        
+        bot.send_chat_action(user_id, 'typing')
+        prompt = f"قم بكتابة شرح تسويقي جذاب وتفصيلي للمنتج التالي لتوضيح أهميته وقيمته للزبون: '{product[1]}'."
+        try:
+            ai_desc = ai_model.generate_content(prompt).text
+        except Exception:
+            ai_desc = "منتج رقمي مميز جاهز للاستلام والتسليم الفوري."
+            
+        msg = (
+            f"📌 <b>المنتج:</b> {product[1]}\n\n"
+            f"💰 <b>السعر:</b> <code>{product[3]:,.0f} SDG</code> / <code>${product[2]:.0f} USD</code>\n\n"
+            f"📖 <b>شرح وتفاصيل المنتج:</b>\n{ai_desc}"
+        )
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        # إضافة زر مشاهدة الفيديو من يوتيوب/الموقع الخارجي
+        markup.add(types.InlineKeyboardButton("🎬 مشاهدة فيديو توضيحي / شرح يوتيوب", url=product[4]))
+        markup.add(types.InlineKeyboardButton("🛒 طريقة الشراء والدفع", callback_data="show_payment"))
+        markup.add(types.InlineKeyboardButton("🔙 العودة للمنتجات", callback_data="show_catalog"))
+        
         bot.send_message(user_id, msg, reply_markup=markup)
 
-    elif data.startswith("buy_info_"):
-        bot.send_message(user_id, "💳 للشراء: قم بالتحويل لأحد الحسابات المتاحة في خيار (طرق الدفع)، ثم أرسل صورة إشعار التحويل هنا مباشرة.")
+    # --- خدمات الرفاهية المضافة ---
+    elif data == "gen_project_idea":
+        bot.send_chat_action(user_id, 'typing')
+        prompt = "اقترح فكرة مشروع تقني أو رقمي مربح وذكية لمطور أو مصمم مبتدئ، مع خطوات التنفيذ باختصار."
+        try:
+            idea = ai_model.generate_content(prompt).text
+            bot.send_message(user_id, f"💡 <b>فكرة مشروع ممتازة لك:</b>\n\n{idea}")
+        except Exception:
+            bot.send_message(user_id, "⚠️ الخدمة مشغولة حالياً، جرب لاحقاً!")
+
+    elif data == "daily_free_feature":
+        bot.send_chat_action(user_id, 'typing')
+        prompt = "اعطني معلومة أو نصيحة تقنية رائعة وغير معروفة لكثير من الناس في مجالات البرمجة أو الذكاء الاصطناعي."
+        try:
+            tip = ai_model.generate_content(prompt).text
+            bot.send_message(user_id, f"🎁 <b>جرعتك اليومية المجانية:</b>\n\n{tip}")
+        except Exception:
+            bot.send_message(user_id, "⚠️ يتعذر الحصول على الجرعة اليومية الآن.")
+
+    elif data == "ask_ai_assistant":
+        user_states[user_id] = "WAITING_CUSTOMER_AI"
+        bot.send_message(user_id, "🤖 <b>أهلاً بك!</b> اكتب لي ما الذي تبحث عنه أو ميزانيتك، وسأرشح لك الخيار الأفضل من المتجر:")
 
     elif data == "show_payment":
         payment_info = (
-            "💳 <b>طرق الدفع المتاحة للتحويل:</b>\n\n"
-            "🇸🇩 <b>بالجنيه السوداني (تطبيق بنكك):</b>\n"
-            f"• رقم الحساب: <code>{BANKAK_ACCOUNT}</code>\n"
-            f"• باسم: <b>{BANKAK_NAME}</b>\n\n"
-            "💵 <b>بالدولار (Binance Pay / Crypto):</b>\n"
-            f"• Binance Pay ID: <code>{BINANCE_PAY_ID}</code>\n"
-            f"• Web3 Wallet: <code>{BINANCE_WALLET_ADDRESS}</code>\n\n"
-            f"📢 <b>القناة الرسمية:</b> {CHANNEL_LINK}\n"
-            "📌 <i>بعد إتمام التحويل، أرسل صورة إشعار التحويل في المحادثة مباشرة لتأكيد التسليم التلقائي!</i>"
+            "💳 <b>طرق الدفع المتاحة:</b>\n\n"
+            f"🇸🇩 <b>بنكك:</b> <code>{BANKAK_ACCOUNT}</code> ({BANKAK_NAME})\n"
+            f"💵 <b>Binance Pay ID:</b> <code>{BINANCE_PAY_ID}</code>\n\n"
+            "📌 <i>أرسل صورة إشعار التحويل في المحادثة مباشرة لتأكيد الطلب واستلامه!</i>"
         )
         bot.send_message(user_id, payment_info)
 
-    elif data.startswith("approve_"):
-        order_id = data.replace("approve_", "")
-        if order_id in pending_orders:
-            order = pending_orders[order_id]
-            order['status'] = 'MANUAL'
-            bot.send_message(order['user_id'], f"🎉 <b>تم تأكيد الدفع وتسليم الخدمة:</b>\n{order['deliver']}")
-            bot.edit_message_caption(f"✅ <b>تم التأكيد يدوياً بواسطة المالك</b>", ADMIN_ID, call.message.message_id)
-            if os.path.exists(order['photo_path']): os.remove(order['photo_path'])
-            del pending_orders[order_id]
-
-    elif data.startswith("reject_"):
-        order_id = data.replace("reject_", "")
-        if order_id in pending_orders:
-            order = pending_orders[order_id]
-            order['status'] = 'MANUAL'
-            bot.send_message(order['user_id'], f"❌ <b>تعذر التأكد من التحويل.</b> تواصل مع الدعم: {YOUR_USERNAME}")
-            bot.edit_message_caption(f"🔴 <b>تم الرفض يدوياً بواسطة المالك</b>", ADMIN_ID, call.message.message_id)
-            if os.path.exists(order['photo_path']): os.remove(order['photo_path'])
-            del pending_orders[order_id]
-
 # ==========================================
-# ♾️ حلقة التشغيل الدائمة ومنع توقف السيرفر
+# 📥 استقبال الرسائل وتوجيه المراقبة والدردشة
 # ==========================================
+@bot.message_handler(func=lambda msg: True)
+def handle_text_messages(message):
+    user_id = message.chat.id
+    
+    # 1. الدردشة الخاصة بين المالك والبوت
+    if user_id == ADMIN_ID and admin_states.get(ADMIN_ID) == "WAITING_ADMIN_AI":
+        admin_states[ADMIN_ID] = None  # إعادة تعيين الحالة بعد الإجابة
+        try:
+            res = ai_model.generate_content(message.text)
+            bot.send_message(ADMIN_ID, f"🤖 <b>الرد الذكي للمالك:</b>\n\n{res.text}")
+        except Exception as e:
+            bot.send_message(ADMIN_ID, f"⚠️ خطأ في معالجة الطلب: {e}")
+
+    # 2. محادثة الزبون مع المساعد الذكي
+    elif user_states.get(user_id) == "WAITING_CUSTOMER_AI":
+        user_states[user_id] = None
+        products = get_products()
+        products_text = "\n".join([f"- {p[1]} ({p[3]} SDG)" for p in products])
+        prompt = f"أنت مساعد متجر Nexus Store. المنتجات:\n{products_text}\nطلب الزبون: '{message.text}'. اقترح عليه الأنسب."
+        try:
+            res = ai_model.generate_content(prompt)
+            bot.send_message(user_id, f"🤖 <b>المساعد الذكي:</b>\n\n{res.text}")
+            
+            # توجيه نسخة من المحادثة للمالك للمراقبة
+            forward_to_admin(message, res.text)
+        except Exception:
+            bot.send_message(user_id, "⚠️ متعذر معالجة الطلب حالياً.")
+
+    # 3. توجيه جميع رسائل الزبائن العادية للمالك
+    elif user_id != ADMIN_ID:
+        forward_to_admin(message, "رسالة عامة (تواصل من زبون)")
+
 if __name__ == "__main__":
     keep_alive()
-    print("🚀 Nexus Store Grand Master Engine Running...")
+    print("🚀 Nexus Store Engine Running with Video Embeds & Admin AI Chat...")
     while True:
         try:
             bot.infinity_polling(timeout=10, long_polling_timeout=5)
         except Exception as e:
-            print(f"⚠️ Error occurred: {e}")
             time.sleep(5)
-
