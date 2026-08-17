@@ -35,7 +35,9 @@ BINANCE_PAY_ID = "943209825"
 BINANCE_WALLET_ADDRESS = "0x6742c39cb07b9fd6a69281dc4b9b96239cc7850a"
 
 genai.configure(api_key=GEMINI_API_KEY)
-ai_model = genai.GenerativeModel('gemini-1.5-flash')
+
+# 🛠️ تم التحديث هنا إلى النموذج المعتمد والمستقر لعدم حدوث خطأ 404
+ai_model = genai.GenerativeModel('gemini-2.5-flash')
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN, parse_mode="HTML")
 
