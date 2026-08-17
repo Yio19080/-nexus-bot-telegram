@@ -27,13 +27,14 @@ def keep_alive():
 TELEGRAM_TOKEN = os.getenv("BOT_TOKEN", "8617844634:AAGfD4f-dpgmpPn2Zo0ZPdaGq09Vvm7cL18")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "ضع_مفتاح_GEMINI_هنا")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7899998427"))
-CHANNEL_ID = os.getenv("CHANNEL_ID", "NexusStoreAr@")
+CHANNEL_ID = os.getenv("CHANNEL_ID", "@NexusStoreAr")
+CHANNEL_LINK = "https://t.me/NexusStoreAr"
 YOUR_USERNAME = os.getenv("YOUR_USERNAME", "@Nexus_Support_v1_Bot")
 
 # 💳 بيانات الدفع الحقيقية المحدثة
 BANKAK_ACCOUNT = "9412190"
 BANKAK_NAME = "يوسف إبراهيم الطيب عبد القادر"
-BINANCE_PAY_ID = "1054497732"
+BINANCE_PAY_ID = "943209825"
 BINANCE_WALLET_ADDRESS = "0x6742c39cb07b9fd6a69281dc4b9b96239cc7850a"
 
 genai.configure(api_key=GEMINI_API_KEY)
@@ -46,7 +47,7 @@ admin_states = {}
 user_states = {}
 
 # ==========================================
-# 🗄️ قاعدة البيانات المتقدمة
+# 🗄️ قاعدة البيانات المتقدمة والمحدثة
 # ==========================================
 def init_db():
     conn = sqlite3.connect('nexus_store.db')
@@ -62,9 +63,10 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            price TEXT,
-            link TEXT
+            name TEXT UNIQUE,
+            price_usd REAL,
+            price_sdg REAL,
+            link TEXT DEFAULT 'https://t.me/NexusStoreAr'
         )
     ''')
     cursor.execute('''
@@ -76,10 +78,27 @@ def init_db():
         )
     ''')
     
-    cursor.execute("SELECT COUNT(*) FROM products")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO products (name, price, link) VALUES ('🎬 حزمة المونتاج الشاملة', '10,000 SDG / $5', 'https://mixkit.co/')")
-        cursor.execute("INSERT INTO products (name, price, link) VALUES ('📝 منشئ الـ CV الذكي', '6,000 SDG / $3', 'https://rxresu.me/')")
+    # المنتجات الثابتة المحدثة بأسعارها
+    default_products = [
+        ("حزمة المونتاج الشاملة 🎬", 8.0, 15000.0),
+        ("منشئ الـ CV الذكي 📝", 5.0, 10000.0),
+        ("كتاب أساسيات لغة بايثون بالعربي 🐍", 5.0, 10000.0),
+        ("حزمة أيقونات وأزرار للمطورين والمصممين 🎨", 4.0, 8000.0),
+        ("قالب موقع متجر إلكتروني احترافي 🌐", 15.0, 30000.0),
+        ("دليل أوامر الذكاء الاصطناعي للمطورين 🤖", 6.0, 12000.0),
+        ("كتاب التفكير الكمبيوتري والبرمجة بالعربي 📘", 5.0, 10000.0),
+        ("حزمة كود الخوارزميات وهياكل البيانات 💻", 8.0, 15000.0),
+        ("كود مصدري لمتجر إلكتروني متكامل جاهز للتعديل 🛒", 20.0, 45000.0),
+        ("دليل أدوات الحماية واختبار الاختراق للمطورين 🛡️", 6.0, 12000.0),
+        ("قالب Admin Dashboard جاهز للمطورين 📊", 10.0, 20000.0),
+        ("دليل أوامر ChatGPT المتقدمة للمطورين 💡", 5.0, 10000.0)
+    ]
+    
+    for name, p_usd, p_sdg in default_products:
+        cursor.execute('''
+            INSERT OR IGNORE INTO products (name, price_usd, price_sdg)
+            VALUES (?, ?, ?)
+        ''', (name, p_usd, p_sdg))
 
     conn.commit()
     conn.close()
@@ -96,15 +115,15 @@ def add_user(user_id, ref_id=0):
 def get_products():
     conn = sqlite3.connect('nexus_store.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, price, link FROM products")
+    cursor.execute("SELECT id, name, price_usd, price_sdg, link FROM products")
     items = cursor.fetchall()
     conn.close()
     return items
 
-def add_product(name, price, link):
+def add_product(name, price_usd, price_sdg, link="https://t.me/NexusStoreAr"):
     conn = sqlite3.connect('nexus_store.db')
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO products (name, price, link) VALUES (?, ?, ?)", (name, price, link))
+    cursor.execute("INSERT INTO products (name, price_usd, price_sdg, link) VALUES (?, ?, ?, ?)", (name, price_usd, price_sdg, link))
     conn.commit()
     conn.close()
 
@@ -136,7 +155,6 @@ def verify_receipt_with_ai(image_path):
 
 def auto_process_receipt(order_id, user_id, photo_path, admin_msg_id, item_name, deliver_link):
     time.sleep(180)
-    
     if order_id in pending_orders and pending_orders[order_id]['status'] == 'WAITING':
         pending_orders[order_id]['status'] = 'PROCESSING'
         verdict = verify_receipt_with_ai(photo_path)
@@ -169,17 +187,32 @@ def start_cmd(message):
         types.InlineKeyboardButton("💳 طرق الدفع (بنكك/دولار)", callback_data="show_payment")
     )
     markup.add(
-        types.InlineKeyboardButton("🎁 نقاط الخصم والإحالة", callback_data="show_referral"),
+        types.InlineKeyboardButton("📢 قناة المتجر الرسمية", url=CHANNEL_LINK),
         types.InlineKeyboardButton("📩 تقديم شكوى / استفسار", callback_data="open_ticket")
     )
     
     if user_id == ADMIN_ID:
         markup.add(types.InlineKeyboardButton("👑 لوحة التحكم الإدارية", callback_data="admin_panel"))
         
-    bot.send_message(user_id, f"أهلاً بك يا <b>{message.from_user.first_name}</b> في متجر Nexus Store المتكامل! 🌟", reply_markup=markup)
+    welcome_text = (
+        f"أهلاً بك يا <b>{message.from_user.first_name}</b> في متجر Nexus Store المتكامل! 🌟\n\n"
+        f"📢 <b>تابع قناتنا الرسمية للتحديثات:</b>\n{CHANNEL_LINK}"
+    )
+    bot.send_message(user_id, welcome_text, reply_markup=markup)
 
 # ==========================================
-# 📥 التعامل مع رسائل الشكاوى وإعدادات المالك
+# 💬 مساحة المحادثة والردود (بين المالك والبوت)
+# ==========================================
+@bot.message_handler(func=lambda msg: msg.chat.id == ADMIN_ID and admin_states.get(ADMIN_ID) is None and not msg.text.startswith('/'))
+def admin_ai_chat(message):
+    try:
+        response = ai_model.generate_content(message.text)
+        bot.send_message(ADMIN_ID, f"🤖 <b>الرد الذكي:</b>\n\n{response.text}")
+    except Exception as e:
+        bot.send_message(ADMIN_ID, f"⚠️ يحدث خطأ أثناء معالجة الرد: {e}")
+
+# ==========================================
+# 📥 التعامل مع الشكاوى وإعدادات المالك
 # ==========================================
 @bot.message_handler(func=lambda msg: user_states.get(msg.chat.id) == "WAITING_TICKET")
 def handle_user_ticket(message):
@@ -214,11 +247,16 @@ def handle_admin_inputs(message):
     elif state == "WAITING_ADD_PRODUCT":
         admin_states[ADMIN_ID] = None
         try:
-            p_name, p_price, p_link = message.text.split('|')
-            add_product(p_name.strip(), p_price.strip(), p_link.strip())
-            bot.send_message(ADMIN_ID, f"✅ تم إضافة المنتج <b>{p_name.strip()}</b> بنجاح!")
+            parts = message.text.split('|')
+            p_name = parts[0].strip()
+            p_usd = float(parts[1].strip())
+            p_sdg = float(parts[2].strip())
+            p_link = parts[3].strip() if len(parts) > 3 else "https://t.me/NexusStoreAr"
+            
+            add_product(p_name, p_usd, p_sdg, p_link)
+            bot.send_message(ADMIN_ID, f"✅ تم إضافة المنتج <b>{p_name}</b> بنجاح!")
         except Exception:
-            bot.send_message(ADMIN_ID, "❌ صيغة خاطئة. أرسل البيانات هكذا:\n<code>اسم المنتج | السعر | رابط التسليم</code>")
+            bot.send_message(ADMIN_ID, "❌ صيغة خاطئة. أرسل البيانات هكذا:\n<code>اسم المنتج | السعر بالدولار | السعر بالجنيه | رابط التسليم</code>")
 
     elif state.startswith("REPLYING_TO_"):
         target_user_id = int(state.replace("REPLYING_TO_", ""))
@@ -243,7 +281,7 @@ def handle_payment_proof(message):
         new_file.write(downloaded_file)
 
     item_name = "الخدمة الرقمية"
-    deliver_link = "https://mixkit.co/"
+    deliver_link = CHANNEL_LINK
 
     bot.send_message(user_id, "✅ <b>تم استلام الإشعار بنجاح!</b>\nسيتم التحقق آلياً وتسليم طلبك خلال 3 دقائق.")
 
@@ -291,7 +329,7 @@ def handle_callbacks(call):
 
     elif data == "trigger_add_product" and user_id == ADMIN_ID:
         admin_states[ADMIN_ID] = "WAITING_ADD_PRODUCT"
-        bot.send_message(user_id, "📝 أرسل بيانات المنتج بالصيغة الآتية:\n<code>اسم المنتج | السعر | رابط التسليم</code>")
+        bot.send_message(user_id, "📝 أرسل بيانات المنتج بالصيغة الآتية:\n<code>اسم المنتج | السعر بالدولار | السعر بالجنيه | رابط التسليم</code>")
 
     elif data.startswith("reply_ticket_") and user_id == ADMIN_ID:
         target_id = data.replace("reply_ticket_", "")
@@ -304,10 +342,10 @@ def handle_callbacks(call):
 
     elif data == "show_catalog":
         products = get_products()
-        msg = "📦 <b>قائمة المنتجات المتاحة:</b>\n\n"
+        msg = f"📦 <b>قائمة المنتجات المتاحة:</b>\n📢 تابع القناة: {CHANNEL_LINK}\n\n"
         markup = types.InlineKeyboardMarkup(row_width=1)
         for p in products:
-            msg += f"• <b>{p[1]}</b> - السعر: <code>{p[2]}</code>\n"
+            msg += f"• <b>{p[1]}</b> - السعر: <code>{p[3]:,.0f} SDG / ${p[2]:.0f}</code>\n"
             markup.add(types.InlineKeyboardButton(f"🛒 شراء {p[1]}", callback_data=f"buy_info_{p[0]}"))
         bot.send_message(user_id, msg, reply_markup=markup)
 
@@ -321,8 +359,9 @@ def handle_callbacks(call):
             f"• رقم الحساب: <code>{BANKAK_ACCOUNT}</code>\n"
             f"• باسم: <b>{BANKAK_NAME}</b>\n\n"
             "💵 <b>بالدولار (Binance Pay / Crypto):</b>\n"
-            f"• Binance ID: <code>{BINANCE_PAY_ID}</code>\n"
+            f"• Binance Pay ID: <code>{BINANCE_PAY_ID}</code>\n"
             f"• Web3 Wallet: <code>{BINANCE_WALLET_ADDRESS}</code>\n\n"
+            f"📢 <b>القناة الرسمية:</b> {CHANNEL_LINK}\n"
             "📌 <i>بعد إتمام التحويل، أرسل صورة إشعار التحويل في المحادثة مباشرة لتأكيد التسليم التلقائي!</i>"
         )
         bot.send_message(user_id, payment_info)
@@ -346,21 +385,17 @@ def handle_callbacks(call):
             bot.edit_message_caption(f"🔴 <b>تم الرفض يدوياً بواسطة المالك</b>", ADMIN_ID, call.message.message_id)
             if os.path.exists(order['photo_path']): os.remove(order['photo_path'])
             del pending_orders[order_id]
-@bot.message_handler(commands=['post'])
-def post_to_channel(message):
-    if message.from_user.id == ADMIN_ID:
-        text = message.text.replace('/post', '').strip()
-        if not text:
-            bot.reply_to(message, "❌ يرجى كتابة النص بعد الأمر.\nمثال:\n`/post مرحباً بكم في المتجر!`", parse_mode="Markdown")
-            return
-        try:
-            bot.send_message(CHANNEL_ID, text)
-            bot.reply_to(message, "✅ تم النشر في القناة بنجاح!")
-        except Exception as e:
-            bot.reply_to(message, f"❌ حدث خطأ أثناء النشر:\n`{e}`", parse_mode="Markdown")
 
+# ==========================================
+# ♾️ حلقة التشغيل الدائمة ومنع توقف السيرفر
+# ==========================================
 if __name__ == "__main__":
     keep_alive()
     print("🚀 Nexus Store Grand Master Engine Running...")
-    bot.infinity_polling(timeout=10, long_polling_timeout=5)
+    while True:
+        try:
+            bot.infinity_polling(timeout=10, long_polling_timeout=5)
+        except Exception as e:
+            print(f"⚠️ Error occurred: {e}")
+            time.sleep(5)
 
