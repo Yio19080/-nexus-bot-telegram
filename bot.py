@@ -36,8 +36,8 @@ BINANCE_WALLET_ADDRESS = "0x6742c39cb07b9fd6a69281dc4b9b96239cc7850a"
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 🛠️ تم التحديث هنا إلى النموذج المعتمد والمستقر لعدم حدوث خطأ 404
-ai_model = genai.GenerativeModel('gemini-2.5-flash')
+# 🛠️ تم التحديث للموديل المطلوب بالضبط في رسالة الخطأ
+ai_model = genai.GenerativeModel('gemini-3.6-flash')
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN, parse_mode="HTML")
 
@@ -69,7 +69,6 @@ def init_db():
         )
     ''')
     
-    # المنتجات الافتراضية مع روابط فيديوهات توضيحية من يوتيوب
     default_products = [
         ("حزمة المونتاج الشاملة 🎬", 8.0, 15000.0, "https://www.youtube.com/results?search_query=video+editing+pack"),
         ("منشئ الـ CV الذكي 📝", 5.0, 10000.0, "https://www.youtube.com/results?search_query=smart+cv+builder"),
@@ -181,7 +180,6 @@ def handle_callbacks(call):
     data = call.data
     user_id = call.message.chat.id
 
-    # --- لوحة المالك والدردشة مع البوت ---
     if data == "admin_panel" and user_id == ADMIN_ID:
         users_count = len(get_all_users())
         markup = types.InlineKeyboardMarkup(row_width=1)
@@ -197,7 +195,6 @@ def handle_callbacks(call):
         admin_states[ADMIN_ID] = "WAITING_ADMIN_AI"
         bot.send_message(user_id, "🤖 <b>وضع الدردشة الذكية مفعل!</b>\nأرسل أي سؤال أو استفسار وسأجيبك فوراً:")
 
-    # --- عرض المنتجات والشرح والفيديو ---
     elif data == "show_catalog":
         products = get_products()
         markup = types.InlineKeyboardMarkup(row_width=1)
@@ -222,14 +219,12 @@ def handle_callbacks(call):
             f"📖 <b>شرح وتفاصيل المنتج:</b>\n{ai_desc}"
         )
         markup = types.InlineKeyboardMarkup(row_width=1)
-        # إضافة زر مشاهدة الفيديو من يوتيوب/الموقع الخارجي
         markup.add(types.InlineKeyboardButton("🎬 مشاهدة فيديو توضيحي / شرح يوتيوب", url=product[4]))
         markup.add(types.InlineKeyboardButton("🛒 طريقة الشراء والدفع", callback_data="show_payment"))
         markup.add(types.InlineKeyboardButton("🔙 العودة للمنتجات", callback_data="show_catalog"))
         
         bot.send_message(user_id, msg, reply_markup=markup)
 
-    # --- خدمات الرفاهية المضافة ---
     elif data == "gen_project_idea":
         bot.send_chat_action(user_id, 'typing')
         prompt = "اقترح فكرة مشروع تقني أو رقمي مربح وذكية لمطور أو مصمم مبتدئ، مع خطوات التنفيذ باختصار."
@@ -268,16 +263,14 @@ def handle_callbacks(call):
 def handle_text_messages(message):
     user_id = message.chat.id
     
-    # 1. الدردشة الخاصة بين المالك والبوت
     if user_id == ADMIN_ID and admin_states.get(ADMIN_ID) == "WAITING_ADMIN_AI":
-        admin_states[ADMIN_ID] = None  # إعادة تعيين الحالة بعد الإجابة
+        admin_states[ADMIN_ID] = None
         try:
             res = ai_model.generate_content(message.text)
             bot.send_message(ADMIN_ID, f"🤖 <b>الرد الذكي للمالك:</b>\n\n{res.text}")
         except Exception as e:
             bot.send_message(ADMIN_ID, f"⚠️ خطأ في معالجة الطلب: {e}")
 
-    # 2. محادثة الزبون مع المساعد الذكي
     elif user_states.get(user_id) == "WAITING_CUSTOMER_AI":
         user_states[user_id] = None
         products = get_products()
@@ -286,19 +279,16 @@ def handle_text_messages(message):
         try:
             res = ai_model.generate_content(prompt)
             bot.send_message(user_id, f"🤖 <b>المساعد الذكي:</b>\n\n{res.text}")
-            
-            # توجيه نسخة من المحادثة للمالك للمراقبة
             forward_to_admin(message, res.text)
         except Exception:
             bot.send_message(user_id, "⚠️ متعذر معالجة الطلب حالياً.")
 
-    # 3. توجيه جميع رسائل الزبائن العادية للمالك
     elif user_id != ADMIN_ID:
         forward_to_admin(message, "رسالة عامة (تواصل من زبون)")
 
 if __name__ == "__main__":
     keep_alive()
-    print("🚀 Nexus Store Engine Running with Video Embeds & Admin AI Chat...")
+    print("🚀 Nexus Store Engine Running...")
     while True:
         try:
             bot.infinity_polling(timeout=10, long_polling_timeout=5)
