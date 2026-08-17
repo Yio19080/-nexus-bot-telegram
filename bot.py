@@ -33,7 +33,7 @@ YOUR_USERNAME = os.getenv("YOUR_USERNAME", "@Nexus_Support_v1_Bot")
 # 💳 بيانات الدفع الحقيقية المحدثة
 BANKAK_ACCOUNT = "9412190"
 BANKAK_NAME = "يوسف إبراهيم الطيب عبد القادر"
-BINANCE_PAY_ID = "987654321"
+BINANCE_PAY_ID = "1054497732"
 BINANCE_WALLET_ADDRESS = "0x6742c39cb07b9fd6a69281dc4b9b96239cc7850a"
 
 genai.configure(api_key=GEMINI_API_KEY)
