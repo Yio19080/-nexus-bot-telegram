@@ -350,4 +350,5 @@ def handle_callbacks(call):
 if __name__ == "__main__":
     keep_alive()
     print("🚀 Nexus Store Grand Master Engine Running...")
-    bot.infinity_polling()
+    bot.infinity_polling(timeout=10, long_polling_timeout=5)
+
