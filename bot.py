@@ -3,7 +3,6 @@ import threading
 import time
 import sqlite3
 import datetime
-import re
 import telebot
 from telebot import types
 from flask import Flask
@@ -16,7 +15,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Nexus Store Engine with Strict Receipt Check is Online!"
+    return "Nexus Store Engine is Fully Online & Complete!"
 
 def keep_alive():
     t = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080))
@@ -38,12 +37,12 @@ BINANCE_WALLET_ADDRESS = "0x6742c39cb07b9fd6a69281dc4b9b96239cc7850a"
 genai.configure(api_key=GEMINI_API_KEY)
 ai_model = genai.GenerativeModel('gemini-3.6-flash')
 
-# تفعيل متعدد المسارات لسرعة فائقة
 bot = telebot.TeleBot(TELEGRAM_TOKEN, parse_mode="HTML", threaded=True, num_threads=10)
 
 admin_states = {}
 user_states = {}
 handled_receipts = set()
+last_generated_ad = {} # لحفظ آخر إعلان تم توليده
 
 # ==========================================
 # 🗄️ قاعدة البيانات
@@ -70,61 +69,13 @@ def init_db():
             description TEXT DEFAULT ''
         )
     ''')
-    
-    default_products = [
-        ("حزمة المونتاج الشاملة 🎬", 8.0, 15000.0, "https://t.me/NexusStoreAr", "https://www.youtube.com/results?search_query=video+editing+pack", "حزمة ملحقات وقوالب احترافية لمصممي الفيديوهات والمونتاج."),
-        ("منشئ الـ CV الذكي 📝", 5.0, 10000.0, "https://t.me/NexusStoreAr", "https://www.youtube.com/results?search_query=smart+cv+builder", "أداة وقوالب سريعة لإنشاء سيرة ذاتية احترافية توافق معايير الشركات."),
-        ("كتاب أساسيات لغة بايثون بالعربي 🐍", 5.0, 10000.0, "https://t.me/NexusStoreAr", "https://www.youtube.com/results?search_query=python+for+beginners+arabic", "كتاب مبسط لشرح لغة بايثون وأساسيات البرمجة باللغة العربية."),
-        ("حزمة أيقونات وأزرار للمطورين والمصممين 🎨", 4.0, 8000.0, "https://t.me/NexusStoreAr", "https://www.youtube.com/results?search_query=ui+ux+icons+pack", "مجموعة كبيرة من الأيقونات والأزرار عالية الجودة لاستخدامها في التطبيقات والمواقع."),
-        ("قالب موقع متجر إلكتروني احترافي 🌐", 15.0, 30000.0, "https://t.me/NexusStoreAr", "https://www.youtube.com/results?search_query=e+commerce+website+template", "قالب متجر إلكتروني متكامل وجاهز للتعديل المباشر."),
-        ("دليل أوامر الذكاء الاصطناعي للمطورين 🤖", 6.0, 12000.0, "https://t.me/NexusStoreAr", "https://www.youtube.com/results?search_query=ai+prompts+for+developers", "مجموعة أوامر وموجهات جاهزة للحصول على أفضل نتائج برمجية من الذكاء الاصطناعي."),
-        ("كتاب التفكير الكمبيوتري والبرمجة بالعربي 📘", 5.0, 10000.0, "https://t.me/NexusStoreAr", "https://www.youtube.com/results?search_query=computational+thinking+arabic", "دليل مبسط لفهم التفكير البرمجي وحل المشكلات التكنولوجية."),
-        ("حزمة كود الخوارزميات وهياكل البيانات 💻", 8.0, 15000.0, "https://t.me/NexusStoreAr", "https://www.youtube.com/results?search_query=data+structures+algorithms", "أكواد مصدريّة وشروحات جاهزة لأهم الخوارزميات وهياكل البيانات."),
-        ("كود مصدري لمتجر إلكتروني متكامل جاهز للتعديل 🛒", 20.0, 45000.0, "https://t.me/NexusStoreAr", "https://www.youtube.com/results?search_query=telegram+bot+store+source+code", "سورس كود كامل لبوت متجر تلجرام جاهز للتشغيل مباشرة."),
-        ("دليل أدوات الحماية واختبار الاختراق للمطورين 🛡️", 6.0, 12000.0, "https://t.me/NexusStoreAr", "https://www.youtube.com/results?search_query=penetration+testing+tools", "دليل شامل لأهم أدوات واختبارات الأمان وحماية التطبيقات."),
-        ("قالب Admin Dashboard جاهز للمطورين 📊", 10.0, 20000.0, "https://t.me/NexusStoreAr", "https://www.youtube.com/results?search_query=admin+dashboard+template", "لوحة تحكم إدارية احترافية لتنظيم وإدارة البيانات بسهولة."),
-        ("دليل أوامر ChatGPT المتقدمة للمطورين 💡", 5.0, 10000.0, "https://t.me/NexusStoreAr", "https://www.youtube.com/results?search_query=chatgpt+advanced+prompts", "طرق وموجهات متقدمة للاستفادة القصوى من خدمات ChatGPT.")
-    ]
-    
-    for name, p_usd, p_sdg, link, v_url, desc in default_products:
-        cursor.execute('''
-            INSERT OR IGNORE INTO products (name, price_usd, price_sdg, link, video_url, description)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (name, p_usd, p_sdg, link, v_url, desc))
-
     conn.commit()
     conn.close()
 
-def add_user(user_id, ref_id=0):
+def add_user(user_id):
     conn = sqlite3.connect('nexus_store.db', check_same_thread=False)
     cursor = conn.cursor()
-    cursor.execute("INSERT OR IGNORE INTO users (user_id, referred_by) VALUES (?, ?)", (user_id, ref_id))
-    conn.commit()
-    conn.close()
-
-def get_products():
-    conn = sqlite3.connect('nexus_store.db', check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name, price_usd, price_sdg, link, video_url, description FROM products")
-    items = cursor.fetchall()
-    conn.close()
-    return items
-
-def get_product_by_id(p_id):
-    conn = sqlite3.connect('nexus_store.db', check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name, price_usd, price_sdg, video_url, description FROM products WHERE id = ?", (p_id,))
-    item = cursor.fetchone()
-    conn.close()
-    return item
-
-def add_new_product(name, price_usd, price_sdg, desc, video_url):
-    conn = sqlite3.connect('nexus_store.db', check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO products (name, price_usd, price_sdg, description, video_url)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (name, price_usd, price_sdg, desc, video_url))
+    cursor.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
     conn.commit()
     conn.close()
 
@@ -139,7 +90,20 @@ def get_all_users():
 init_db()
 
 # ==========================================
-# 🧠 دالة الفحص الدقيق والمحدث للإشعار (الاسم + الحساب + التاريخ)
+# 🎨 مولد الإعلانات والتصاميم المجاني 100%
+# ==========================================
+def generate_free_ad(topic):
+    prompt_text = f"اكتب نص إعلاني ترويجي جذاب جداً وقصير ومناسب للتليجرام عن: {topic}. استخدم الإيموجي والوسوم المناسبة."
+    ad_text = ai_model.generate_content(prompt_text).text
+
+    prompt_img_desc = f"Give me a 3-word English search query for an advertising image related to: {topic}."
+    img_keyword = ai_model.generate_content(prompt_img_desc).text.strip().replace(" ", "%20")
+
+    image_url = f"https://image.pollinations.ai/prompt/professional%20advertising%20banner%20for%20{img_keyword}?width=800&height=500&nologo=true"
+    return ad_text, image_url
+
+# ==========================================
+# 🧠 دالة الفحص الآلي للإشعار
 # ==========================================
 def ai_verify_receipt(receipt_info, image_path=None):
     current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -149,12 +113,12 @@ def ai_verify_receipt(receipt_info, image_path=None):
     تاريخ ووقت النظام الحالي هو: {current_time_str}
 
     المطلوب منك فحص الإشعار والتحقق الصارم من الشروط التالية:
-    1. **مطابقة الاسم:** يجب أن يكون اسم المرسل إليه هو "يوسف ابراهيم الطيب عبدالقادر" (أو يوسف إبراهيم الطيب عبد القادر مع مراعاة همزات الألف والمسافات).
-    2. **مطابقة رقم الحساب:** يجب أن يحتوي الإشعار على رقم الحساب "9412190" (تذكر أن تطبيق بنكك يكتبه بشكل كامل مكون من 16 رقماً مثل 1003 0941 2190 0001 حيث يمثل المقطع الأوسط 0941 2190 الرقم 9412190).
-    3. **فحص التاريخ والوقت:** يجب أن يكون تاريخ العملية حديثاً وقريباً جداً من وقت النظام الحالي ({current_time_str}). يمنع تماماً قبول أي إشعارات بتواريخ مستقبليّة أو قديمة جداً.
+    1. **مطابقة الاسم:** يجب أن يكون اسم المرسل إليه هو "يوسف ابراهيم الطيب عبدالقادر".
+    2. **مطابقة رقم الحساب:** يجب أن يحتوي الإشعار على رقم الحساب "9412190".
+    3. **فحص التاريخ والوقت:** يجب أن يكون تاريخ العملية حديثاً وقريباً جداً من وقت النظام الحالي ({current_time_str}).
 
-    إذا تحققت الشروط الثلاثة، ابدأ إجابتك بكلمة: 'APPROVED' ثم اكتب الشرح باختصار.
-    إذا اختل أي شرط من الشروط، ابدأ إجابتك بكلمة: 'REJECTED' واذكر السبب بالتفصيل (مثل: عدم تطابق الاسم، الحساب غير صحيح، التاريخ في المستقبل، إلخ).
+    إذا تحققت الشروط، ابدأ بـ: 'APPROVED'.
+    إذا اختل أي شرط، ابدأ بـ: 'REJECTED' واذكر السبب بالتفصيل.
     """
 
     try:
@@ -164,39 +128,32 @@ def ai_verify_receipt(receipt_info, image_path=None):
             response = ai_model.generate_content([prompt, img, receipt_info]).text.strip()
         else:
             response = ai_model.generate_content(f"{prompt}\n\nبيانات الإشعار النصية:\n{receipt_info}").text.strip()
-            
         return response
     except Exception as e:
         return f"REJECTED\nتعذر فحص الإشعار آلياً: {e}"
 
-# ==========================================
-# ⏱️ خيط المراقبة والفحص بعد دقيقة واحدة
-# ==========================================
 def process_receipt_after_timeout(receipt_id, user_id, receipt_content, image_path=None):
-    time.sleep(60) # الانتظار دقيقة واحدة للمالك
-    
+    time.sleep(60)
     if receipt_id in handled_receipts:
-        return # المالك وافق أو رفض يدويًا قبل انتهاء الدقيقة
+        return
 
     handled_receipts.add(receipt_id)
-    
-    # تنفيذ الفحص بالذكاء الاصطناعي
     ai_result = ai_verify_receipt(receipt_content, image_path)
     
     if image_path and os.path.exists(image_path):
         try:
-            os.remove(image_path) # تنظيف الصورة المؤقتة
+            os.remove(image_path)
         except Exception:
             pass
 
     if ai_result.startswith("APPROVED"):
         explanation = ai_result.replace("APPROVED", "").strip()
-        bot.send_message(user_id, f"✅ <b>تم القبول التلقائي للإشعار بنجاح!</b>\n\n🎯 <b>مطابقة البيانات:</b> الاسم ورقم الحساب والتاريخ صحيحة.\n📝 <i>التفاصيل:</i> {explanation}\n\nجاري تسليم الخدمة لك.")
-        bot.send_message(ADMIN_ID, f"⚡ <b>قبول آلي لإشعار تحويل (عدم الرد خلال دقيقة):</b>\n👤 الزبون: <code>{user_id}</code>\n📝 {explanation}")
+        bot.send_message(user_id, f"✅ <b>تم قبول الإشعار بنجاح!</b>\n\n🎯 الاسم ورقم الحساب والتاريخ متطابقة.\n📝 {explanation}")
+        bot.send_message(ADMIN_ID, f"⚡ <b>قبول آلي لإشعار (عدم الرد خلال دقيقة):</b>\n👤 الزبون: <code>{user_id}</code>\n📝 {explanation}")
     else:
         explanation = ai_result.replace("REJECTED", "").strip()
-        bot.send_message(user_id, f"❌ <b>تم رفض الإشعار تلقائياً!</b>\n\n⚠️ <i>سبب الرفض:</i> {explanation}\n💬 إذا كان هناك خطأ، تواصل مع الدعم.")
-        bot.send_message(ADMIN_ID, f"⚠️ <b>رفض آلي لإشعار تحويل غير مطابق:</b>\n👤 الزبون: <code>{user_id}</code>\n📝 {explanation}")
+        bot.send_message(user_id, f"❌ <b>تم رفض الإشعار تلقائياً!</b>\n\n⚠️ {explanation}")
+        bot.send_message(ADMIN_ID, f"⚠️ <b>رفض آلي لإشعار غير مطابق:</b>\n👤 الزبون: <code>{user_id}</code>\n📝 {explanation}")
 
 # ==========================================
 # 🚀 القائمة الرئيسية
@@ -208,29 +165,16 @@ def start_cmd(message):
     
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("📦 تصفح المتجر والمنتجات", callback_data="show_catalog"),
-        types.InlineKeyboardButton("💡 مولد أفكار المشاريع (مجاناً)", callback_data="gen_project_idea")
-    )
-    markup.add(
-        types.InlineKeyboardButton("🎁 جرعة الرفاهية والمعرفة اليومية", callback_data="daily_free_feature"),
-        types.InlineKeyboardButton("🤖 المساعد الذكي لاقتراح المنتجات", callback_data="ask_ai_assistant")
-    )
-    markup.add(
-        types.InlineKeyboardButton("💳 طرق الدفع", callback_data="show_payment"),
-        types.InlineKeyboardButton("📩 الشكاوى والدعم", callback_data="open_ticket")
+        types.InlineKeyboardButton("💳 طرق الدفع", callback_data="show_payment")
     )
     
     if user_id == ADMIN_ID:
-        markup.add(types.InlineKeyboardButton("👑 لوحة التحكم الإدارية", callback_data="admin_panel"))
+        markup.add(types.InlineKeyboardButton("👑 لوحة التحكم والمستشار الإعلاني", callback_data="admin_panel"))
         
-    welcome_text = (
-        f"أهلاً بك يا <b>{message.from_user.first_name}</b> في متجر Nexus المتطور! 🌟\n\n"
-        "عند التحويل، يرجى إرسال صورة أو نص إشعار بنكك هنا ليتم التثبت منه فوراً."
-    )
-    bot.send_message(user_id, welcome_text, reply_markup=markup)
+    bot.send_message(user_id, f"أهلاً بك يا <b>{message.from_user.first_name}</b>!", reply_markup=markup)
 
 # ==========================================
-# 🔘 معالجة الأزرار تفاعلياً
+# 🔘 تفاعلات لوحة المالك والإعلانات
 # ==========================================
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
@@ -242,112 +186,65 @@ def handle_callbacks(call):
     data = call.data
     user_id = call.message.chat.id
 
-    # --- أزرار المالك للموافقة/الرفض اليدوي ---
     if data.startswith("appr_rcpt_") and user_id == ADMIN_ID:
         rcpt_id = data.replace("appr_rcpt_", "")
         handled_receipts.add(rcpt_id)
         target_user = int(rcpt_id.split("_")[0])
-        try:
-            bot.send_message(target_user, "✅ <b>تمت الموافقة على إشعار التحويل يدوياً بواسطة المالك!</b>\nجاري تجهيز وتسليم الطلب.")
-            bot.edit_message_text(f"{call.message.text}\n\n✅ <b>تم قبول الإشعار وتأكيده يدويًا بواسطة المالك.</b>", chat_id=ADMIN_ID, message_id=call.message.message_id)
-        except Exception:
-            bot.send_message(ADMIN_ID, "⚠️ تعذر التواصل مع الزبون.")
+        bot.send_message(target_user, "✅ <b>تمت الموافقة على إشعار التحويل يدوياً بواسطة المالك!</b>")
+        bot.edit_message_text(f"{call.message.text}\n\n✅ <b>تم القبول يدوياً.</b>", chat_id=ADMIN_ID, message_id=call.message.message_id)
 
     elif data.startswith("reje_rcpt_") and user_id == ADMIN_ID:
         rcpt_id = data.replace("reje_rcpt_", "")
         handled_receipts.add(rcpt_id)
         target_user = int(rcpt_id.split("_")[0])
-        try:
-            bot.send_message(target_user, "❌ <b>عذراً، تم رفض إشعار التحويل من قبل المالك.</b>\nتأكد من صحة الحساب والتحويل ثم تواصل معنا.")
-            bot.edit_message_text(f"{call.message.text}\n\n❌ <b>تم رفض الإشعار يدويًا بواسطة المالك.</b>", chat_id=ADMIN_ID, message_id=call.message.message_id)
-        except Exception:
-            bot.send_message(ADMIN_ID, "⚠️ تعذر التواصل مع الزبون.")
+        bot.send_message(target_user, "❌ <b>عذراً، تم رفض إشعار التحويل من قبل المالك.</b>")
+        bot.edit_message_text(f"{call.message.text}\n\n❌ <b>تم الرفض يدوياً.</b>", chat_id=ADMIN_ID, message_id=call.message.message_id)
 
-    # --- لوحة التحكم ---
     elif data == "admin_panel" and user_id == ADMIN_ID:
-        users_count = len(get_all_users())
         markup = types.InlineKeyboardMarkup(row_width=1)
         markup.add(
-            types.InlineKeyboardButton("💬 بدء محادثة ودردشة مع البوت (Gemini)", callback_data="start_admin_chat"),
-            types.InlineKeyboardButton("📢 إرسال إذاعة جماعية (Broadcast)", callback_data="start_broadcast"),
-            types.InlineKeyboardButton("➕ إضافة منتج جديد للمتجر", callback_data="trigger_add_product")
+            types.InlineKeyboardButton("📢 صانع الإعلانات والصور الفورية", callback_data="create_instant_ad"),
+            types.InlineKeyboardButton("💡 اقتراح أفكار إعلانية", callback_data="get_ad_ideas")
         )
-        msg = f"👑 <b>لوحة تحكم المالك:</b>\n\n👥 <b>عدد العملاء:</b> <code>{users_count}</code>\n⚡ اختر الإجراء المطلوب:"
+        msg = "👑 <b>لوحة المالك والإنتاج الإعلاني:</b>\nاختر الخدمة المطلوبة:"
         bot.send_message(user_id, msg, reply_markup=markup)
 
-    elif data == "start_admin_chat" and user_id == ADMIN_ID:
-        admin_states[ADMIN_ID] = "WAITING_ADMIN_AI"
-        bot.send_message(user_id, "🤖 <b>وضع الدردشة الذكية مفعل!</b>\nأرسل استفسارك وسأجيبك فوراً:")
+    elif data == "create_instant_ad" and user_id == ADMIN_ID:
+        admin_states[ADMIN_ID] = "WAITING_AD_TOPIC"
+        bot.send_message(user_id, "🎯 أرسل موضوع الإعلان والمطلوب فوراً:")
 
-    elif data == "start_broadcast" and user_id == ADMIN_ID:
-        admin_states[ADMIN_ID] = "WAITING_BROADCAST_TEXT"
-        bot.send_message(user_id, "📢 <b>إرسال إذاعة جماعية:</b>\nاكتب النص المطلوب نشره وإرساله لجميع العملاء الآن:")
-
-    elif data == "trigger_add_product" and user_id == ADMIN_ID:
-        admin_states[ADMIN_ID] = "WAITING_ADD_PRODUCT_DATA"
-        msg = "➕ <b>إضافة منتج جديد:</b>\nأرسل البيانات بفواصل <code>|</code>:\n<code>اسم المنتج | سعر_دولار | سعر_سوداني | الوصف | رابط_الفيديو</code>"
-        bot.send_message(user_id, msg)
-
-    # --- الكتالوج والمنتجات ---
-    elif data == "show_catalog":
-        products = get_products()
-        markup = types.InlineKeyboardMarkup(row_width=1)
-        for p in products:
-            markup.add(types.InlineKeyboardButton(f"{p[1]} - {p[3]:,.0f} SDG / ${p[2]:.0f}", callback_data=f"product_detail_{p[0]}"))
-        bot.send_message(user_id, "📦 <b>اختر أي منتج لعرض التفاصيل والفيديو التوضيحي:</b>", reply_markup=markup)
-
-    elif data.startswith("product_detail_"):
-        p_id = int(data.replace("product_detail_", ""))
-        product = get_product_by_id(p_id)
-        desc = product[5] if len(product) > 5 and product[5] else "منتج رقمي مميز جاهز للاستلام والتسليم الفوري."
-            
-        msg = (
-            f"📌 <b>المنتج:</b> {product[1]}\n\n"
-            f"💰 <b>السعر:</b> <code>{product[3]:,.0f} SDG</code> / <code>${product[2]:.0f} USD</code>\n\n"
-            f"📖 <b>الشرح:</b>\n{desc}"
-        )
-        markup = types.InlineKeyboardMarkup(row_width=1)
-        markup.add(types.InlineKeyboardButton("🎬 مشاهدة فيديو توضيحي", url=product[4]))
-        markup.add(types.InlineKeyboardButton("🛒 طريقة الشراء والدفع", callback_data="show_payment"))
-        markup.add(types.InlineKeyboardButton("🔙 العودة للمنتجات", callback_data="show_catalog"))
-        
-        bot.send_message(user_id, msg, reply_markup=markup)
-
-    elif data == "gen_project_idea":
+    elif data == "get_ad_ideas" and user_id == ADMIN_ID:
         bot.send_chat_action(user_id, 'typing')
         try:
-            idea = ai_model.generate_content("اقترح فكرة مشروع تقني أو رقمي مربح باختصار شديد.").text
-            bot.send_message(user_id, f"💡 <b>فكرة مشروع ممتازة:</b>\n\n{idea}")
+            ideas = ai_model.generate_content("اقترح 3 أفكار حملات إعلانية لمتجر تلجرام.").text
+            bot.send_message(user_id, f"💡 <b>أفكار إعلانية:</b>\n\n{ideas}")
         except Exception:
-            bot.send_message(user_id, "⚠️ الخدمة مشغولة حالياً!")
+            bot.send_message(user_id, "⚠️ متعذر جلب الأفكار حالياً.")
 
-    elif data == "daily_free_feature":
-        bot.send_chat_action(user_id, 'typing')
-        try:
-            tip = ai_model.generate_content("اعطني نصيحة تقنية ممتازة وسريعة في البرمجة.").text
-            bot.send_message(user_id, f"🎁 <b>جرعتك اليومية:</b>\n\n{tip}")
-        except Exception:
-            bot.send_message(user_id, "⚠️ متعذر جلب النصيحة الآن.")
-
-    elif data == "ask_ai_assistant":
-        user_states[user_id] = "WAITING_CUSTOMER_AI"
-        bot.send_message(user_id, "🤖 <b>أهلاً بك!</b> اكتب لي ما الذي تبحث عنه وسأرشح لك الخيار الأفضل:")
+    elif data == "broadcast_last_ad" and user_id == ADMIN_ID:
+        if last_generated_ad.get("text") and last_generated_ad.get("image"):
+            users = get_all_users()
+            sent_count = 0
+            for u_id in users:
+                try:
+                    bot.send_photo(u_id, last_generated_ad["image"], caption=last_generated_ad["text"])
+                    sent_count += 1
+                except Exception:
+                    pass
+            bot.send_message(ADMIN_ID, f"✅ <b>تم نشر الإعلان والصورة بنجاح لـ {sent_count} مستخدم!</b>")
+        else:
+            bot.send_message(ADMIN_ID, "⚠️ لا يوجد إعلان محفوظ للنشر.")
 
     elif data == "show_payment":
         payment_info = (
-            "💳 <b>طرق الدفع المتاحة:</b>\n\n"
             f"🇸🇩 <b>بنكك:</b> <code>{BANKAK_ACCOUNT}</code> ({BANKAK_NAME})\n"
-            f"💵 <b>Binance Pay ID:</b> <code>{BINANCE_PAY_ID}</code>\n"
-            f"🌐 <b>عنوان المحفظة:</b> <code>{BINANCE_WALLET_ADDRESS}</code>\n\n"
-            "📌 <i>أرسل نص إشعار التحويل أو صورته هنا مباشرة لتأكيد الطلب!</i>"
+            f"💵 <b>Binance Pay ID:</b> <code>{BINANCE_PAY_ID}</code>\n\n"
+            "📌 <i>أرسل نص أو صورة الإشعار هنا مباشرة!</i>"
         )
         bot.send_message(user_id, payment_info)
 
-    elif data == "open_ticket":
-        bot.send_message(user_id, "📩 أرسل استفسارك هنا مباشرة وسيقوم المالك بالرد عليك فوراً.")
-
 # ==========================================
-# 🖼️ استقبال صور الإشعارات المالية وقراءتها
+# 🖼️ استقبال صور الإشعارات
 # ==========================================
 @bot.message_handler(content_types=['photo'])
 def handle_photo_receipt(message):
@@ -358,116 +255,79 @@ def handle_photo_receipt(message):
     rcpt_id = f"{user_id}_{message.message_id}"
     caption = message.caption if message.caption else "صورة إشعار تحويل مالي"
 
-    # حفظ الصورة مؤقتاً لقراءتها وفحصها
     file_info = bot.get_file(message.photo[-1].file_id)
     downloaded_file = bot.download_file(file_info.file_path)
     temp_img_path = f"temp_rcpt_{rcpt_id}.jpg"
     with open(temp_img_path, 'wb') as new_file:
         new_file.write(downloaded_file)
 
-    # تجهيز أزرار المالك
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("✅ موافقة وتأكيد", callback_data=f"appr_rcpt_{rcpt_id}"),
-        types.InlineKeyboardButton("❌ رفض الإشعار", callback_data=f"reje_rcpt_{rcpt_id}")
+        types.InlineKeyboardButton("✅ موافقة", callback_data=f"appr_rcpt_{rcpt_id}"),
+        types.InlineKeyboardButton("❌ رفض", callback_data=f"reje_rcpt_{rcpt_id}")
     )
-    markup.add(types.InlineKeyboardButton("💬 مراسلة الزبون", url=f"tg://user?id={user_id}"))
 
     bot.send_photo(
         ADMIN_ID, 
         message.photo[-1].file_id, 
-        caption=f"💳 <b>إشعار تحويل مالي جديد (صورة):</b>\n👤 من: {message.from_user.first_name} (<code>{user_id}</code>)\n📝 {caption}", 
+        caption=f"💳 <b>إشعار جديد (صورة):</b>\n👤 من: {user_id}\n📝 {caption}", 
         reply_markup=markup
     )
     
-    bot.send_message(user_id, "⏳ <b>تم استلام صورة الإشعار!</b>\nجاري الانتظار أو الفحص التلقائي للاسم والبريد والتاريخ خلال دقيقة...")
+    bot.send_message(user_id, "⏳ <b>تم استلام صورة الإشعار!</b> جاري الفحص...")
 
-    # بدء خيط المراقبة والفحص الآلي بعد دقيقة
-    t = threading.Thread(target=process_receipt_after_timeout, args=(rcpt_id, user_id, f"صورة إشعار تحويل. نص مرفق: {caption}", temp_img_path))
+    t = threading.Thread(target=process_receipt_after_timeout, args=(rcpt_id, user_id, f"صورة إشعار. نص: {caption}", temp_img_path))
     t.daemon = True
     t.start()
 
 # ==========================================
-# 📥 استقبال الرسائل النصية والإشعارات
+# 📥 استقبال الرسائل النصية
 # ==========================================
 @bot.message_handler(func=lambda msg: True)
 def handle_text_messages(message):
     user_id = message.chat.id
     text = message.text
-    
-    # 1. حالة المالك: دردشة Gemini
-    if user_id == ADMIN_ID and admin_states.get(ADMIN_ID) == "WAITING_ADMIN_AI":
-        admin_states[ADMIN_ID] = None
-        try:
-            res = ai_model.generate_content(text)
-            bot.send_message(ADMIN_ID, f"🤖 <b>الرد الذكي:</b>\n\n{res.text}")
-        except Exception as e:
-            bot.send_message(ADMIN_ID, f"⚠️ خطأ: {e}")
 
-    # 2. حالة المالك: الإذاعة الجماعية السريعة
-    elif user_id == ADMIN_ID and admin_states.get(ADMIN_ID) == "WAITING_BROADCAST_TEXT":
+    if user_id == ADMIN_ID and admin_states.get(ADMIN_ID) == "WAITING_AD_TOPIC":
         admin_states[ADMIN_ID] = None
-        users = get_all_users()
-        sent_count = 0
-        bot.send_message(ADMIN_ID, f"⏳ جاري إرسال الإذاعة إلى <code>{len(users)}</code> مستخدم...")
+        bot.send_message(ADMIN_ID, "🚀 <b>جاري تصميم الإعلان وتوليد الصورة...</b>")
         
-        for u_id in users:
-            try:
-                bot.send_message(u_id, f"📢 <b>تنبيه من الإدارة:</b>\n\n{text}")
-                sent_count += 1
-            except Exception:
-                pass
-        bot.send_message(ADMIN_ID, f"✅ <b>تم الإرسال بنجاح!</b> إلى <code>{sent_count}</code> مستخدم.")
-
-    # 3. حالة المالك: إضافة منتج
-    elif user_id == ADMIN_ID and admin_states.get(ADMIN_ID) == "WAITING_ADD_PRODUCT_DATA":
-        admin_states[ADMIN_ID] = None
         try:
-            parts = [p.strip() for p in text.split("|")]
-            add_new_product(parts[0], float(parts[1]), float(parts[2]), parts[3], parts[4])
-            bot.send_message(ADMIN_ID, f"✅ تم إضافة المنتج <b>{parts[0]}</b> بنجاح!")
-        except Exception:
-            bot.send_message(ADMIN_ID, "⚠️ خطأ في التنسيق!")
+            ad_text, img_url = generate_free_ad(text)
+            last_generated_ad["text"] = ad_text
+            last_generated_ad["image"] = img_url
+            
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("📢 نشر هذا الإعلان فوراً لجميع العملاء", callback_data="broadcast_last_ad"))
+            
+            bot.send_photo(ADMIN_ID, img_url, caption=f"🎯 <b>الإعلان الجاهز:</b>\n\n{ad_text}", reply_markup=markup)
+        except Exception as e:
+            bot.send_message(ADMIN_ID, f"⚠️ حدث خطأ: {e}")
 
-    # 4. حالة الزبون: المساعد الذكي
-    elif user_states.get(user_id) == "WAITING_CUSTOMER_AI":
-        user_states[user_id] = None
-        products = get_products()
-        products_text = "\n".join([f"- {p[1]} ({p[3]} SDG)" for p in products])
-        prompt = f"المنتجات المتاحة:\n{products_text}\nطلب الزبون: '{text}'. اقترح عليه الأنسب باختصار."
-        try:
-            res = ai_model.generate_content(prompt)
-            bot.send_message(user_id, f"🤖 <b>المساعد الذكي:</b>\n\n{res.text}")
-        except Exception:
-            bot.send_message(user_id, "⚠️ متعذر معالجة الطلب حالياً.")
-
-    # 5. استقبال الرسائل وإشعارات التحويل النصية من العملاء
     elif user_id != ADMIN_ID:
         rcpt_id = f"{user_id}_{message.message_id}"
         
         markup = types.InlineKeyboardMarkup(row_width=2)
         markup.add(
-            types.InlineKeyboardButton("✅ موافقة وتأكيد", callback_data=f"appr_rcpt_{rcpt_id}"),
-            types.InlineKeyboardButton("❌ رفض الإشعار", callback_data=f"reje_rcpt_{rcpt_id}")
+            types.InlineKeyboardButton("✅ موافقة", callback_data=f"appr_rcpt_{rcpt_id}"),
+            types.InlineKeyboardButton("❌ رفض", callback_data=f"reje_rcpt_{rcpt_id}")
         )
-        markup.add(types.InlineKeyboardButton("💬 مراسلة الزبون", url=f"tg://user?id={user_id}"))
 
         bot.send_message(
             ADMIN_ID, 
-            f"🔔 <b>رسالة / إشعار تحويل جديد من زبون:</b>\n👤 من: {message.from_user.first_name} (<code>{user_id}</code>)\n\n💬 <b>النص:</b>\n<i>{text}</i>", 
+            f"🔔 <b>رسالة / إشعار جديد:</b>\n👤 من: <code>{user_id}</code>\n💬 <i>{text}</i>", 
             reply_markup=markup
         )
         
-        bot.send_message(user_id, "⏳ <b>تم استلام الرسالة/الإشعار!</b>\nسيتم التحقق والفحص التلقائي للاسم والحساب خلال دقيقة واحدة.")
+        bot.send_message(user_id, "⏳ <b>تم استلام الرسالة!</b> جاري الفحص الآلي...")
 
-        # تشغيل خيط الفحص الآلي بالذكاء الاصطناعي بعد دقيقة
         t = threading.Thread(target=process_receipt_after_timeout, args=(rcpt_id, user_id, text, None))
         t.daemon = True
         t.start()
 
 if __name__ == "__main__":
     keep_alive()
-    print("🚀 Nexus Store Engine with Strict Receipt Check Active...")
+    print("🚀 Nexus Store Fully Online...")
     while True:
         try:
             bot.infinity_polling(timeout=10, long_polling_timeout=5)
