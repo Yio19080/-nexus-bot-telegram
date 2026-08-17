@@ -346,6 +346,18 @@ def handle_callbacks(call):
             bot.edit_message_caption(f"🔴 <b>تم الرفض يدوياً بواسطة المالك</b>", ADMIN_ID, call.message.message_id)
             if os.path.exists(order['photo_path']): os.remove(order['photo_path'])
             del pending_orders[order_id]
+@bot.message_handler(commands=['post'])
+def post_to_channel(message):
+    if message.from_user.id == ADMIN_ID:
+        text = message.text.replace('/post', '').strip()
+        if not text:
+            bot.reply_to(message, "❌ يرجى كتابة النص بعد الأمر.\nمثال:\n`/post مرحباً بكم في المتجر!`", parse_mode="Markdown")
+            return
+        try:
+            bot.send_message(CHANNEL_ID, text)
+            bot.reply_to(message, "✅ تم النشر في القناة بنجاح!")
+        except Exception as e:
+            bot.reply_to(message, f"❌ حدث خطأ أثناء النشر:\n`{e}`", parse_mode="Markdown")
 
 if __name__ == "__main__":
     keep_alive()
