@@ -27,7 +27,7 @@ def keep_alive():
 TELEGRAM_TOKEN = os.getenv("BOT_TOKEN", "8617844634:AAGfD4f-dpgmpPn2Zo0ZPdaGq09Vvm7cL18")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "ضع_مفتاح_GEMINI_هنا")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7899998427"))
-CHANNEL_ID = os.getenv("CHANNEL_ID", "https://t.me/NexusStoreAr")
+CHANNEL_ID = os.getenv("CHANNEL_ID", "NexusStoreAr@")
 YOUR_USERNAME = os.getenv("YOUR_USERNAME", "@Nexus_Support_v1_Bot")
 
 # 💳 بيانات الدفع الحقيقية المحدثة
